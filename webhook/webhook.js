@@ -20,6 +20,20 @@ if (USE_LOCAL_ENDPOINT) {
 
 // Basic API wrappers, these will be called by higher level wrappers
 
+async function _get(url) {
+  let request = {
+    method: 'GET',
+    headers: {
+      "Authorization": "Basic Og==",
+      'Content-Type': 'application/json',
+      'x-access-token': token,
+    }
+  }
+  const serverReturn = await fetch(ENDPOINT_URL + url, request)
+  const serverResponse = await serverReturn.json()
+  return serverResponse
+}
+
 async function _put(url, body) {
   let request = {
     method: 'PUT',
@@ -70,7 +84,7 @@ async function agentMessage(message) {
     },
     body: JSON.stringify({ 'text': message, 'isUser': false })
   };
-  const serverReturn = await fetch('https://mysqlcs639.cs.wisc.edu/application/messages', request)
+  const serverReturn = await fetch(ENDPOINT_URL + '/application/messages', request)
   const serverResponse = await serverReturn.json()
   return serverResponse
 }
@@ -84,7 +98,7 @@ async function userMessage(message) {
     },
     body: JSON.stringify({ 'text': message, 'isUser': true })
   };
-  const serverReturn = await fetch('https://mysqlcs639.cs.wisc.edu/application/messages', request)
+  const serverReturn = await fetch(ENDPOINT_URL+ '/application/messages', request)
   const serverResponse = await serverReturn.json()
   return serverResponse
 }
@@ -116,13 +130,13 @@ app.post('/', express.json(), (req, res) => {
 
     let responses = ['Hello!', 'What can I do for you today?'];
     await _post(
-      'https://mysqlcs639.cs.wisc.edu/application/messages',
+      ENDPOINT_URL + '/application/messages',
       { 'text': '' + agent.query, 'isUser': true }
     )
     agent.add(responses[0])
     agent.add(responses[1])
     await _post(
-      'https://mysqlcs639.cs.wisc.edu/application/messages',
+      ENDPOINT_URL + '/application/messages',
       { 'text': '' + responses[0] + '\n' + responses[1], 'isUser': false }
     )
   }
@@ -137,10 +151,101 @@ app.post('/', express.json(), (req, res) => {
       agent.add("Sorry, your username or password is incorrect.");
       await agentMessage("Sorry, your username or password is incorrect.");
     } else {
-      await _delete("https://mysqlcs639.cs.wisc.edu/application/messages")
+      await _delete(ENDPOINT_URL + "/application/messages")
       agent.add("Welcome to Wiscshop!")
       await agentMessage("Welcome to Wiscshop!")
     }
+  }
+
+  async function category_query() {
+    let responses = [
+      "No problem.",
+      "OK.",
+      "Sure.",
+      "Got it.",
+      "Here's what I've found for you.",
+    ];
+    await userMessage(agent.query);
+    serverResponse = await _get("/categories");
+    await agentMessage(responses[Math.floor(Math.random() * responses.length)]);
+    let catString = "";
+    serverResponse.categories.forEach((element, index) => {
+      catString += element + ", ";
+    })
+    await agentMessage("These categories of products are offered: " + catString);
+    
+  }
+
+  async function category_tag_query() {
+    let responses = [
+      "No problem.",
+      "OK.",
+      "Sure.",
+      "Got it.",
+      "Here's what I've found for you.",
+    ];
+    await userMessage(agent.query);
+    serverResponse = await _get("/categories/" + agent.parameters.category + "/tags")
+    await agentMessage(responses[Math.floor(Math.random() * responses.length)]);
+    let tagString = "";
+    serverResponse.tags.forEach((element, index) => {
+      tagString += element + ", ";
+    })
+    await agentMessage("These tags are found under " + agent.parameters.category + ": " + tagString)
+  }
+
+  async function cart_number() {
+    let greetingSyno = [
+      "You have ",
+      "There are "
+    ];
+    let cartSyno = [
+      "cart.",
+      "shopping cart.",
+      "shopping bag.",
+      "bag."
+    ];
+    await userMessage(agent.query)
+    serverResponse = await _get('/application/products')
+    await agentMessage(greetingSyno[Math.floor(Math.random() * greetingSyno.length)]
+       + serverResponse.products.length + " items in your " + cartSyno[Math.floor(Math.random() * cartSyno.length)])
+  }
+
+  async function cart_price() {
+    let cartSyno = [
+      "cart",
+      "shopping cart",
+      "shopping bag",
+      "bag"
+    ];
+    await userMessage(agent.query)
+    serverResponse = await _get('/application/products')
+    let priceSum = 0;
+    serverResponse.products.forEach(item => {
+      priceSum += item.price
+    })
+    await agentMessage("The total cost of products in your " + cartSyno[Math.floor(Math.random() * cartSyno.length)] + " is: " + priceSum + " dollars")
+  }
+
+  async function cart_category() {
+    let greetingSyno = [
+      "These are the different categories of items in your bag: ",
+      "Here's a list of different styles of items you have selected: ",
+      "You have these styles of products added to your shopping cart: "
+    ]
+    await userMessage(agent.query);
+    serverResponse = await _get('/application/products');
+    let catCollection = new Set();
+    serverResponse.products.forEach(item => {
+      catCollection.add(item.category);
+    })
+    let str = "[ ";
+    catCollection.forEach(style => {
+      str += style.toString() + " ";
+    })
+    str += "]"
+    await agentMessage(greetingSyno[Math.floor(Math.random() * greetingSyno.length)] + str)
+
   }
 
   async function navigate() {
@@ -175,18 +280,24 @@ app.post('/', express.json(), (req, res) => {
       } else if (agent.parameters.page === 'Back') {
         body = { "back": true };
       }
-      await _put('https://mysqlcs639.cs.wisc.edu/application', body)
+      // navigate to that page
+      await _put(ENDPOINT_URL + '/application', body)
     }
   }
 
 
-  let intentMap = new Map()
-  intentMap.set('Default Welcome Intent', welcome)
+  let intentMap = new Map();
+  intentMap.set('Default Welcome Intent', welcome);
   // You will need to declare this `Login` content in DialogFlow to make this work
-  intentMap.set('Login Intent', login)
-  intentMap.set('Navigate Intent', navigate)
-
-  agent.handleRequest(intentMap)
+  intentMap.set('Login Intent', login);
+  intentMap.set('Navigate Intent', navigate);
+  intentMap.set('Category Query Intent', category_query)
+  intentMap.set('Category Tag Query Intent', category_tag_query)
+  // Cart Query Options
+  intentMap.set('Cart Query Number Intent', cart_number)
+  intentMap.set('Cart Query Price Intent', cart_price)
+  intentMap.set('Cart Query Category Intent', cart_category)
+  agent.handleRequest(intentMap);
 })
 
 app.listen(process.env.PORT || 8080)
