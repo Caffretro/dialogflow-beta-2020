@@ -98,7 +98,7 @@ async function userMessage(message) {
     },
     body: JSON.stringify({ 'text': message, 'isUser': true })
   };
-  const serverReturn = await fetch(ENDPOINT_URL+ '/application/messages', request)
+  const serverReturn = await fetch(ENDPOINT_URL + '/application/messages', request)
   const serverResponse = await serverReturn.json()
   return serverResponse
 }
@@ -173,7 +173,7 @@ app.post('/', express.json(), (req, res) => {
       catString += element + ", ";
     })
     await agentMessage("These categories of products are offered: " + catString);
-    
+
   }
 
   async function category_tag_query() {
@@ -208,7 +208,7 @@ app.post('/', express.json(), (req, res) => {
     await userMessage(agent.query)
     serverResponse = await _get('/application/products')
     await agentMessage(greetingSyno[Math.floor(Math.random() * greetingSyno.length)]
-       + serverResponse.products.length + " items in your " + cartSyno[Math.floor(Math.random() * cartSyno.length)])
+      + serverResponse.products.length + " items in your " + cartSyno[Math.floor(Math.random() * cartSyno.length)])
   }
 
   async function cart_price() {
@@ -246,6 +246,84 @@ app.post('/', express.json(), (req, res) => {
     str += "]"
     await agentMessage(greetingSyno[Math.floor(Math.random() * greetingSyno.length)] + str)
 
+  }
+
+  async function product_information() {
+    let responses = [
+      "No problem.",
+      "OK.",
+      "Sure.",
+      "Got it."
+    ];
+    await userMessage(agent.query);
+    let pageData = await _get('/application')
+    let page = pageData.page
+    let id = agent.parameters.product
+    if (!Number.isInteger(Number(page.substring(page.lastIndexOf("/") + 1)))) {
+      await _put(ENDPOINT_URL + '/application', { 'page': page + '/products/' + id })
+      let productData = await _get('/products/' + id);
+      let description = productData.description;
+      await agentMessage(responses[Math.floor(Math.random() * responses.length)] + "Here's a short description for it: " + description)
+    }
+  }
+
+  async function product_review() {
+    await userMessage(agent.query)
+    // get the id of current product
+    let pageData = await _get('/application')
+    let page = pageData.page
+    let id = Number(page.substring(page.lastIndexOf("/") + 1))
+    if (Number.isInteger(id)) {
+      let reviewData = await _get("/products/" + id + "/reviews");
+      reviews = reviewData.reviews
+      if (reviews.length === 0) {
+        await agentMessage("There is no rating for this product right now. You can try other products.")
+        return
+      }
+      let avgRating = 0;
+      let strRating = "The average rating for this product is ";
+      let strReview = "Here is a list of at most 5 reviews of this product: "
+      for (let i = 0; i < reviews.length; i++) {
+        avgRating += reviews[i].stars;
+        if (i < 5) {
+          // display at most 5 items
+          strReview += 1 + i + ". " + reviews[i].text + "; ";
+        }
+      }
+      strRating += avgRating + ". ";
+      await agentMessage(strRating);
+      await agentMessage(strReview);
+    } else {
+      await agentMessage("You are not in a product page, please navigate to a product and try to ask for reviews again.")
+    }
+
+  }
+
+  async function tag_filter() {
+    let responses = [
+      "No problem.",
+      "OK.",
+      "Sure.",
+      "Got it."
+    ];
+    await userMessage(agent.query);
+    await agentMessage(responses[Math.floor(Math.random() * responses.length)] + "I'm Filtering out the products for you...");
+    let tags = agent.parameters.tags;
+    for (let i = 0; i < tags.length; i++) {
+      await _post(ENDPOINT_URL + '/application/tags/' + tags[i].toString());
+    }
+  }
+
+  async function tag_delete() {
+    let responses = [
+      "No problem.",
+      "OK.",
+      "Sure.",
+      "Got it."
+    ];
+    await userMessage(agent.query);
+    await agentMessage(responses[Math.floor(Math.random() * responses.length)] + "Showing all the products in this category for you...");
+    await _delete(ENDPOINT_URL + '/application/tags');
   }
 
   async function navigate() {
@@ -297,6 +375,12 @@ app.post('/', express.json(), (req, res) => {
   intentMap.set('Cart Query Number Intent', cart_number)
   intentMap.set('Cart Query Price Intent', cart_price)
   intentMap.set('Cart Query Category Intent', cart_category)
+  // Product Query Options
+  intentMap.set('Product Query Information Intent', product_information)
+  intentMap.set('Product Query Review Intent', product_review)
+  // narrow down
+  intentMap.set('Tag Filter Intent', tag_filter)
+  intentMap.set('Tag Delete Intent', tag_delete)
   agent.handleRequest(intentMap);
 })
 
