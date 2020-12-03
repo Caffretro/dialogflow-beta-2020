@@ -326,19 +326,65 @@ app.post('/', express.json(), (req, res) => {
     await _delete(ENDPOINT_URL + '/application/tags');
   }
 
+  async function cart_add() {
+    let responses = [
+      "No problem.",
+      "OK.",
+      "Sure.",
+      "Got it."
+    ];
+    await userMessage(agent.query);
+    await agentMessage(responses[Math.floor(Math.random() * responses.length)] + "Adding this item to your cart...");
+    let pageData = await _get('/application');
+    let page = pageData.page;
+    let id = Number(page.substring(page.lastIndexOf("/") + 1));
+    if (Number.isInteger(id)) {
+      // get the quantity of items user wants to add
+      let quantity = agent.parameters.quantity;
+      for (let i = 0; i < quantity; i++){
+        await _post(ENDPOINT_URL + '/application/products/' + id);
+      }
+    } else {
+      await agentMessage("You are not in a product page, please navigate to a product and try to ask for reviews again.")
+    }
+  }
+
+  async function cart_delete() {
+    let responses = [
+      "No problem.",
+      "OK.",
+      "Sure.",
+      "Got it."
+    ];
+    await userMessage(agent.query);
+    await agentMessage(responses[Math.floor(Math.random() * responses.length)] + "Modifying your cart...");
+    let cartData = await _get('/application/products');
+    let cart = cartData.products;
+    let deleteID = Number(agent.parameters.product);
+    let quantity = agent.parameters.quantity;
+    for (let i = 0; i < cart.length; i++) {
+      if (Number(cart[i].id) === deleteID) {
+        await agentMessage("Recognized");
+        for (let j = 0; j < quantity; j++) {
+          await _delete(ENDPOINT_URL + '/application/products/' + deleteID);
+        }
+      }
+    }
+  }
+
   async function navigate() {
     let responses = [
       "No problem.",
       "OK.",
       "Sure.",
       "Got it."
-    ]
-    await userMessage(agent.query)
+    ];
+    await userMessage(agent.query);
     // await _put('https://mysqlcs639.cs.wisc.edu/application', {'page': '/' + username})
     if (agent.parameters.page !== null) {
       // randomly select a success message
-      await agentMessage(responses[Math.floor(Math.random() * responses.length)])
-      let body = {}
+      await agentMessage(responses[Math.floor(Math.random() * responses.length)]);
+      let body = {};
       if (agent.parameters.page === "Home") {
         body = { 'page': '/' + username };
       } else if (agent.parameters.page === 'Cart') {
@@ -359,7 +405,7 @@ app.post('/', express.json(), (req, res) => {
         body = { "back": true };
       }
       // navigate to that page
-      await _put(ENDPOINT_URL + '/application', body)
+      await _put(ENDPOINT_URL + '/application', body);
     }
   }
 
@@ -369,18 +415,21 @@ app.post('/', express.json(), (req, res) => {
   // You will need to declare this `Login` content in DialogFlow to make this work
   intentMap.set('Login Intent', login);
   intentMap.set('Navigate Intent', navigate);
-  intentMap.set('Category Query Intent', category_query)
-  intentMap.set('Category Tag Query Intent', category_tag_query)
+  intentMap.set('Category Query Intent', category_query);
+  intentMap.set('Category Tag Query Intent', category_tag_query);
   // Cart Query Options
-  intentMap.set('Cart Query Number Intent', cart_number)
-  intentMap.set('Cart Query Price Intent', cart_price)
-  intentMap.set('Cart Query Category Intent', cart_category)
+  intentMap.set('Cart Query Number Intent', cart_number);
+  intentMap.set('Cart Query Price Intent', cart_price);
+  intentMap.set('Cart Query Category Intent', cart_category);
   // Product Query Options
-  intentMap.set('Product Query Information Intent', product_information)
-  intentMap.set('Product Query Review Intent', product_review)
+  intentMap.set('Product Query Information Intent', product_information);
+  intentMap.set('Product Query Review Intent', product_review);
   // narrow down
-  intentMap.set('Tag Filter Intent', tag_filter)
-  intentMap.set('Tag Delete Intent', tag_delete)
+  intentMap.set('Tag Filter Intent', tag_filter);
+  intentMap.set('Tag Delete Intent', tag_delete);
+  // cart operations
+  intentMap.set('Cart Add Intent', cart_add);
+  intentMap.set('Cart Delete Intent', cart_delete);
   agent.handleRequest(intentMap);
 })
 
