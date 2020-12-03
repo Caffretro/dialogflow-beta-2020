@@ -148,12 +148,11 @@ app.post('/', express.json(), (req, res) => {
     password = agent.parameters.password
     await getToken()
     if (typeof token === 'undefined') {
-      agent.add("Sorry, your username or password is incorrect.");
       await agentMessage("Sorry, your username or password is incorrect.");
     } else {
       await _delete(ENDPOINT_URL + "/application/messages")
-      agent.add("Welcome to Wiscshop!")
       await agentMessage("Welcome to Wiscshop!")
+      await _put(ENDPOINT_URL + '/application', { 'page': '/' + username });
     }
   }
 
