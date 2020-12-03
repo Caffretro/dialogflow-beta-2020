@@ -341,7 +341,7 @@ app.post('/', express.json(), (req, res) => {
     if (Number.isInteger(id)) {
       // get the quantity of items user wants to add
       let quantity = agent.parameters.quantity;
-      for (let i = 0; i < quantity; i++){
+      for (let i = 0; i < quantity; i++) {
         await _post(ENDPOINT_URL + '/application/products/' + id);
       }
     } else {
@@ -357,7 +357,7 @@ app.post('/', express.json(), (req, res) => {
       "Got it."
     ];
     await userMessage(agent.query);
-    await agentMessage(responses[Math.floor(Math.random() * responses.length)] + "Modifying your cart...");
+    await agentMessage(responses[Math.floor(Math.random() * responses.length)] + " Modifying your cart...");
     let cartData = await _get('/application/products');
     let cart = cartData.products;
     let deleteID = Number(agent.parameters.product);
@@ -370,6 +370,43 @@ app.post('/', express.json(), (req, res) => {
         }
       }
     }
+  }
+
+  async function cart_clear() {
+    let responses = [
+      "No problem.",
+      "OK.",
+      "Sure.",
+      "Got it."
+    ];
+    await userMessage(agent.query);
+    await agentMessage(responses[Math.floor(Math.random() * responses.length)] + " Clearing your shopping cart...");
+    await _delete(ENDPOINT_URL + '/application/products');l
+  }
+
+  async function cart_review() {
+    let responses = [
+      "No problem.",
+      "OK.",
+      "Sure.",
+      "Got it."
+    ];
+    await userMessage(agent.query);
+    await agentMessage(responses[Math.floor(Math.random() * responses.length)] + " Guiding you to your cart...");
+    await _put(ENDPOINT_URL + '/application', { 'page': '/' + username + '/cart-review' });
+  }
+
+  async function cart_confirm() {
+    let responses = [
+      "No problem.",
+      "OK.",
+      "Sure.",
+      "Got it."
+    ];
+    await userMessage(agent.query);
+    await agentMessage(responses[Math.floor(Math.random() * responses.length)] + " Checking you out...");
+    await _put(ENDPOINT_URL + '/application', { 'page': '/' + username + '/cart-confirmed' });
+    await agentMessage("You are all set! Hope you enjoyed your shopping!");
   }
 
   async function navigate() {
@@ -430,6 +467,9 @@ app.post('/', express.json(), (req, res) => {
   // cart operations
   intentMap.set('Cart Add Intent', cart_add);
   intentMap.set('Cart Delete Intent', cart_delete);
+  intentMap.set('Cart Review Intent', cart_review);
+  intentMap.set('Cart Clear Intent', cart_clear)
+  intentMap.set('Cart Confirm Intent', cart_confirm);
   agent.handleRequest(intentMap);
 })
 
